@@ -1,0 +1,17 @@
+{
+  "title": "Bosso Design Studio",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Enable the design library",
+        "description": "Designs and previews are stored locally. Live playback requires a separate opt-in.",
+        "data": {
+          "enable_playback": "Enable physical lighting changes"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured."
+    }
+  }
+}

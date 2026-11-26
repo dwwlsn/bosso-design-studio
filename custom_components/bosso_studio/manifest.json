@@ -1,0 +1,12 @@
+{
+  "domain": "bosso_studio",
+  "name": "Bosso Design Studio",
+  "version": "0.1.0",
+  "config_flow": true,
+  "dependencies": [
+    "bosso"
+  ],
+  "documentation": "https://github.com/Bosso-Family/hass-bosso",
+  "codeowners": [],
+  "iot_class": "cloud_push"
+}

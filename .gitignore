@@ -1,0 +1,12 @@
+*
+!*/
+!.gitignore
+!README.md
+!hacs.json
+!tests/test_design.py
+!custom_components/bosso_studio/__init__.py
+!custom_components/bosso_studio/config_flow.py
+!custom_components/bosso_studio/design.py
+!custom_components/bosso_studio/manifest.json
+!custom_components/bosso_studio/strings.json
+!custom_components/bosso_studio/translations/en.json
