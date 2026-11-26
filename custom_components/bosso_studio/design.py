@@ -26,6 +26,35 @@ def compile_strip(colors, count, sections):
     return strip
 
 
+def clone_effect(state, colors, settings):
+    """Copy controller effect parameters and replace only explicitly supplied values."""
+    if not isinstance(state.get("fx"), int) or not state["fx"]:
+        raise ValueError("Select an animated source preset.")
+    slots = state.get("col")
+    if not isinstance(slots, list) or not slots or any(
+        not isinstance(slot, list) or len(slot) != 4 for slot in slots
+    ):
+        raise ValueError("Source must have RGBW color slots.")
+    result = deepcopy(state)
+    if colors is not None:
+        if len(colors) != len(slots) or any(
+            not isinstance(color, list) or len(color) != 4 or
+            any(type(v) is not int or not 0 <= v <= 255 for v in color)
+            for color in colors
+        ):
+            raise ValueError("Supply one [red, green, blue, white] byte array per source slot.")
+        result["col"] = deepcopy(colors)
+    for key, value in settings.items():
+        if key in ("rev", "mi"):
+            valid = type(value) is bool
+        else:
+            valid = key in ("fx", "sx", "ix", "pal", "c1x", "c2x", "c3x", "cct") and type(value) is int and 0 <= value <= 255
+        if not valid or key == "fx" and value == 0:
+            raise ValueError(f"Invalid animated effect setting: {key}")
+        result[key] = value
+    return result
+
+
 class Library:
     def __init__(self, storage, designs):
         self.storage = storage

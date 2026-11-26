@@ -9,7 +9,7 @@ from homeassistant.helpers import llm
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
-from .design import Library, compile_strip
+from .design import Library, clone_effect, compile_strip
 
 DOMAIN = "bosso_studio"
 
@@ -117,8 +117,27 @@ async def async_setup_entry(hass, entry):
             "brief":brief,"references":references,"images":images,"colors":colors,"led_count":led_count,
             "sections":sections,"source":source})
 
+    async def save_effect(id, base_revision, preset=None, category="predefined", colors=None, settings=None, brief=None):
+        previous = library.get(id, base_revision) if base_revision else {}
+        source = await inspect(preset, category) if preset else previous.get("source")
+        if not source:
+            raise ValueError("Specify a source preset for this design.")
+        if any(source["colors_from_bosso"]):
+            raise ValueError("This preset includes per-pixel overrides that cannot be recolored as effect slots.")
+        initial = source["state"] if preset else previous.get("effect", source["state"])
+        effect = clone_effect(initial, colors, settings or {})
+        return await library.save(id, base_revision, {
+            "kind": "effect", "source": source, "effect": effect,
+            "led_count": sum(source["channels"]),
+            "brief": previous.get("brief", "") if brief is None else brief,
+            "references": previous.get("references", ""), "images": previous.get("images", []),
+        })
+
     async def preview(id, revision):
         record = library.get(id,revision)
+        if record.get("kind") == "effect":
+            return {"id": id, "revision": revision, "kind": "effect",
+                    "state": record["effect"], "channels": record["source"]["channels"]}
         pixels = compile_strip(record["colors"],record["led_count"],record["sections"])
         return {"id":id,"revision":revision,"order":"LED 1 first","pixels":pixels}
 
@@ -126,20 +145,26 @@ async def async_setup_entry(hass, entry):
         async with apply_lock:
             record = library.get(id,revision)
             source = record.get("source") or {}
-            samples = source.get("colors_from_bosso",[])
-            if not samples or not all(isinstance(v,str) for v in samples):
-                raise ValueError("Requires a static reference preset with a verified RGB string encoding.")
-            prefix = "#" if samples[0].startswith("#") else ""
-            if source.get("state",{}).get("fx") != 0 or not all(re.fullmatch(prefix+r"[0-9a-fA-F]{6}",v) for v in samples):
-                raise ValueError("Live playback supports only verified static RGB references.")
+            if not source:
+                raise ValueError("A controller reference preset is required for playback.")
             coord, device = target()
             actual = await coord.api.async_get_device_config(device)
             counts = [int(actual.get(f"data_{n}_led_count") or 0) for n in range(1,5)]
             if device != source["device"] or counts != source["channels"] or sum(counts) != record["led_count"]:
                 raise ValueError("Controller or LED layout differs from this design.")
-            pixels = (await preview(id,revision))["pixels"]
-            payload = deepcopy(source["state"])
-            payload["device"] = {"device":device,"i":[prefix+p[1:] for p in pixels]}
+            if record.get("kind") == "effect":
+                payload = deepcopy(record["effect"])
+                payload["device"] = {"device": device, "i": source["colors_from_bosso"]}
+            else:
+                samples = source.get("colors_from_bosso", [])
+                if not samples or not all(isinstance(v, str) for v in samples):
+                    raise ValueError("Requires a static reference preset with a verified RGB string encoding.")
+                prefix = "#" if samples[0].startswith("#") else ""
+                if source.get("state", {}).get("fx") != 0 or not all(re.fullmatch(prefix+r"[0-9a-fA-F]{6}", v) for v in samples):
+                    raise ValueError("Static designs require a static RGB reference.")
+                pixels = (await preview(id, revision))["pixels"]
+                payload = deepcopy(source["state"])
+                payload["device"] = {"device": device, "i": [prefix+p[1:] for p in pixels]}
             await coord.async_apply_to_home(payload)
             return {"id":id,"revision":revision,"status":"submitted","physical_result":"unverified"}
 
@@ -153,7 +178,13 @@ async def async_setup_entry(hass, entry):
                    {ID:KEY,"base_revision":int,"brief":MAX_TEXT,"colors":COLORS,"led_count":int,
                     vol.Optional("images"):[{"type":vol.In(["image/png","image/jpeg"]),"data":str}],vol.Optional("sections"):[SECTION],vol.Optional("references"):MAX_TEXT,
                     vol.Optional("preset"):str,vol.Optional("category"):vol.In(["predefined","user"])},save,read=False),
-        StudioTool("BossoPreviewDesign","Return the ordered RGB pixels for an exact revision.",{ID:KEY,REV:int},preview),
+        StudioTool("BossoSaveEffect","Clone an animated preset or edit a saved effect. Colors are RGBW byte arrays in source slot order. Omitted settings retain their values. Saving does not apply.",
+                   {ID: KEY, "base_revision": int, vol.Optional("preset"): str,
+                    vol.Optional("category"): vol.In(["predefined", "user"]),
+                    vol.Optional("colors"): [[int]], vol.Optional("brief"): MAX_TEXT,
+                    vol.Optional("settings"): {**{vol.Optional(k): int for k in ("fx","sx","ix","pal","c1x","c2x","c3x","cct")},
+                                               vol.Optional("rev"): bool, vol.Optional("mi"): bool}}, save_effect, read=False),
+        StudioTool("BossoPreviewDesign","Return the saved effect parameters or ordered static RGB pixels.",{ID:KEY,REV:int},preview),
     ]
     if entry.data.get("enable_playback"):
         tools.append(StudioTool("BossoApplyDesign","Display a saved revision on the physical house lights.",

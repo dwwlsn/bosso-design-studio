@@ -4,6 +4,7 @@
 !README.md
 !hacs.json
 !tests/test_design.py
+!examples/bills-carolina-pattern.json
 !custom_components/bosso_studio/__init__.py
 !custom_components/bosso_studio/config_flow.py
 !custom_components/bosso_studio/design.py
