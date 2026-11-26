@@ -1,0 +1,26 @@
+{
+  "id": "bills-carolina-pattern",
+  "base_revision": 1,
+  "preset": "Carolina - Blue & Black",
+  "colors": [
+    [
+      0,
+      0,
+      255,
+      0
+    ],
+    [
+      255,
+      0,
+      0,
+      0
+    ],
+    [
+      255,
+      255,
+      255,
+      0
+    ]
+  ],
+  "brief": "Carolina animation in Bills blue, red and white."
+}

@@ -19,6 +19,18 @@ class Disk:
 
 
 class Tests(unittest.IsolatedAsyncioTestCase):
+    def test_carolina_clone(self):
+        source = {"fx": 34, "sx": 149, "ix": 255, "pal": 5,
+                  "col": [[0,124,196,0], [0,0,0,0], [207,207,207,224]]}
+        bills = [[0,0,255,0], [255,0,0,0], [255,255,255,0]]
+        effect = design.clone_effect(source, bills, {})
+        self.assertEqual(effect, {**source, "col": bills})
+        self.assertNotEqual(source["col"], bills)
+        self.assertEqual(design.clone_effect(effect, None, {"sx": 99}), {**effect, "sx": 99})
+        for colors, settings in [(bills[:1], {}), (None, {"fx": 0}), (None, {"ix": 256}), (None, {"rev": 1})]:
+            with self.assertRaises(ValueError):
+                design.clone_effect(source, colors, settings)
+
     def test_preview(self):
         self.assertEqual(design.compile_strip(["#ff0000","#0000ff"],5,[dict(first=3,last=4,colors=["#ffffff"])]),
                          ["#FF0000","#0000FF","#FFFFFF","#FFFFFF","#FF0000"])
